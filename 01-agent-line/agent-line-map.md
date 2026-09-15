@@ -10,26 +10,37 @@ List every discrete decision or action in your agent's workflow, then score each
 
 | Decision / action | Reversibility (H/M/L) | Blast radius (H/M/L) | Measurability (H/M/L) | Above / Below | HITL? |
 |---|---|---|---|---|---|
-| _Pull project state + recent GitHub/Jira activity_ | H | L | H | Below | · |
-| _Draft the weekly leadership status update_ | H | M | M | Below | spot-check |
-| _Propose next sprint's stories from the PRD (within cap)_ | M | M | M | Below | spot-check |
-| _Post the update to a channel / commit a ship date_ | L | H | M | Above | required |
-| _Mark a launch gate green / merge or close a ticket_ | L | H | M | Above | required |
-| _…_ | | | | | |
+| Pull project state + recent GitHub/Jira activity | H | L | H | Below | · |
+| Decide relevant context | H | M | M | Below | spot-check |
+| Draft the weekly leadership status update | H | M | M | Below | spot-check |
+| Decide tone and commitment level | M | H | L | Above | required |
+| Flag at-risk items / escalation signals | H | L | H | Below | spot-check |
+| Choose what and to whom to escalate | L | H | M | Above | required |
+| Propose next sprint's stories from the PRD (within cap) | M | M | M | Below | spot-check |
+| Post the update to a channel / commit a ship date | L | H | M | Above | required |
+
 
 ## Agent anatomy (sketch)
 
-- **Model:** _your default fast model + when you escalate to a frontier model, and why_
-- **Tools:** _project + activity lookup (read) · past-update search · roadmap · team norms · story proposal (capped) …_
-- **Memory:** _what persists across runs (roadmap, decisions, norms) vs. purged_
-- **Loop:** _placeholder, defined in M2 loop-spec.md_
-- **Bounds:** _placeholder, defined in M5 bounds-and-evals.md_
-- **Evals:** _placeholder, defined in M5 bounds-and-evals.md_
+- **Model:** Default fast model is `gpt-4o-mini` (fast, cost-effective); escalate to a frontier model (`gpt-4o` or Claude 3.5 Sonnet) when synthesizing conflicting cross-functional PRDs or resolving ambiguous dependency blockers.
+- **Tools:** `get_project` (status & linked PRD), `get_activity` (merged PRs, open issues, Sev-1s), `search_past_updates` (historical tone & precedent), `get_roadmap` (milestones & embargo flags), `get_norms` (team PM playbook), and `propose_stories` (queue candidate user stories capped at 10 items).
+- **Memory:** Persists team norms, roadmap context, and past decisions via lookup/search. Purges raw commit histories and intermediate drafting traces between runs to prevent token drift and context pollution.
+- **Loop:** Minimal explicit tool-calling loop; fires on schedule/trigger, stopping on completion or cap *(placeholder, defined in M2 loop-spec.md)*.
+- **Bounds:** Hard boundaries: `MAX_ITERATIONS=8`, `MAX_REVISIONS=2`, `COST_CAP_USD=0.50`, `MAX_QUEUE_ITEMS=10`, and strictly no publishing tools *(placeholder, defined in M5 bounds-and-evals.md)*.
+- **Evals:** Trajectory evals covering happy-path status drafting, missing data handling, and prompt-injection / jailbreak refusal *(placeholder, defined in M5 bounds-and-evals.md)*.
 
 ## The golden rule, applied
 
-_One sentence per above-the-line decision: why it stays human (which of reversibility / blast radius / measurability failed)._
+- **Pull project state + recent GitHub/Jira activity** sits below the line because it's high to reverse (read-only query), has a low blast radius, and is high to verify deterministically against GitHub/Jira, deciding factor: high reversibility & low blast radius.
+- **Decide relevant context** sits below the line because it's high to reverse within internal draft memory, has a medium blast radius, and is medium to verify, deciding factor: high reversibility (with PM spot-check).
+- **Draft the weekly leadership status update** sits below the line because it's high to reverse (saved locally in `run-output/`), has a medium blast radius, and is medium to verify, deciding factor: high reversibility (with PM review before release).
+- **Decide tone and commitment level** sits above the line because it's medium to reverse once expectations anchor, has a high blast radius with leadership, and is low to verify objectively, deciding factor: high blast radius & low measurability.
+- **Flag at-risk items / escalation signals** sits below the line because it's high to reverse (dismissible by PM if a false alarm), has a low blast radius, and is high to verify against threshold rules, deciding factor: high reversibility & low blast radius.
+- **Choose what and to whom to escalate** sits above the line because it's low to reverse once leadership is summoned, has a high blast radius on executive attention, and is medium to verify, deciding factor: low reversibility & high blast radius.
+- **Propose next sprint's stories from the PRD (within cap)** sits below the line because it's medium to reverse (queue capped at 10), has a medium blast radius (no Jira commit), and is medium to verify, deciding factor: bounded blast radius (with grooming approval HITL).
+- **Post the update to a channel / commit a ship date** sits above the line because it's low to reverse once announced publicly, has a high blast radius company-wide, and is medium to verify, deciding factor: low reversibility & high blast radius.
 
 ## Hardest call
 
-_Your toughest "above vs below" decision and how you resolved it. (Share this in `#cohort-channel`.)_
+**Deciding tone and commitment level:** While Cortex has the analytical capability to project delivery dates from sprint velocity, committing to an executive ship date involves organizational promises and external dependencies outside the agent's visibility. The deciding factor was **blast radius**—an overconfident commitment creates immediate stakeholder misalignment that only a human PM can be accountable for.
+
