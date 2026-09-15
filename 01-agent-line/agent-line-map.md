@@ -8,16 +8,17 @@
 
 List every discrete decision or action in your agent's workflow, then score each one and place it **above** the line (a human owns it) or **below** (the agent owns it). Borderline calls get an HITL checkpoint.
 
-| Decision / action | Reversibility (H/M/L) | Blast radius (H/M/L) | Measurability (H/M/L) | Above / Below | HITL? |
-|---|---|---|---|---|---|
-| Pull project state + recent GitHub/Jira activity | H | L | H | Below | · |
-| Decide relevant context | H | M | M | Below | spot-check |
-| Draft the weekly leadership status update | H | M | M | Below | spot-check |
-| Decide tone and commitment level | M | H | L | Above | required |
-| Flag at-risk items / escalation signals | H | L | H | Below | spot-check |
-| Choose what and to whom to escalate | L | H | M | Above | required |
-| Propose next sprint's stories from the PRD (within cap) | M | M | M | Below | spot-check |
-| Post the update to a channel / commit a ship date | L | H | M | Above | required |
+| Decision / action | Reversibility (H/M/L) | Blast radius (H/M/L) | Measurability (H/M/L) | Rule Trigger | Above / Below | HITL Checkpoint | One-Sentence Golden Rule Justification |
+|---|:---:|:---:|:---:|:---:|:---:|---|---|
+| Pull project state + recent GitHub/Jira activity | 🟢 H | 🟢 L | 🟢 H | All-Green | Below | None (`·` autonomous) | Sits below the line because it's high to reverse (read-only query), has a low blast radius, and is high to verify deterministically; deciding factor: high reversibility & low blast radius. |
+| Decide relevant context | 🟢 H | 🟡 M | 🟡 M | Borderline (Yellow) | Below | Spot-check (verify selected inputs) | Sits below the line because it's high to reverse in internal memory, has a medium blast radius, and is medium to verify; deciding factor: high reversibility with PM spot-check. |
+| Draft the weekly leadership status update | 🟢 H | 🟡 M | 🟡 M | Borderline (Yellow) | Below | Spot-check (review & edit local draft) | Sits below the line because it's high to reverse (saved locally in `run-output/`), has a medium blast radius, and is medium to verify; deciding factor: high reversibility with PM review before release. |
+| Decide tone and commitment level | 🟡 M | 🔴 H | 🔴 L | Any-Red (Blast H, Meas L) | Above | Required (PM sets commitment & tone) | Sits above the line because it's medium to reverse once expectations anchor, has a high blast radius with leadership, and is low to verify objectively; deciding factor: high blast radius & low measurability. |
+| Flag at-risk items / escalation signals | 🟢 H | 🟢 L | 🟢 H | All-Green | Below | None (`·` diagnostic flag) | Sits below the line because it's high to reverse (dismissible by PM if a false alarm), has a low blast radius, and is high to verify against threshold rules; deciding factor: high reversibility & low blast radius. |
+| Choose what and to whom to escalate | 🔴 L | 🔴 H | 🟡 M | Any-Red (Rev L, Blast H) | Above | Required (PM initiates escalation) | Sits above the line because it's low to reverse once leadership is summoned, has a high blast radius on executive attention, and is medium to verify; deciding factor: low reversibility & high blast radius. |
+| Propose next sprint's stories from the PRD (within cap) | 🟡 M | 🟡 M | 🟡 M | Borderline (Yellow) | Below | Approval gate (PM approves queue into Jira) | Sits below the line because it's medium to reverse (queue capped at 10), has a medium blast radius (no Jira commit), and is medium to verify; deciding factor: bounded blast radius with grooming approval. |
+| Post the update to a channel / commit a ship date | 🔴 L | 🔴 H | 🟡 M | Any-Red (Rev L, Blast H) | Above | Required (PM manually sends/publishes) | Sits above the line because it's low to reverse once announced publicly, has a high blast radius company-wide, and is medium to verify; deciding factor: low reversibility & high blast radius. |
+
 
 
 ## Agent anatomy (sketch)
