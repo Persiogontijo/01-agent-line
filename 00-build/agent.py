@@ -43,15 +43,17 @@ try:  # load .env if python-dotenv is installed; harmless if it isn't
 except ImportError:
     pass
 
-# --- Bounds (your M5 deliverable: tune these and justify them) ----------------
-MODEL = os.environ.get("CORTEX_MODEL", "gpt-4o-mini")
+# --- Bounds & Model Setup (Gemini-first with multi-LLM compatibility) ---------
+PROVIDER = os.environ.get("CORTEX_PROVIDER", "gemini").lower()
+MODEL = os.environ.get("CORTEX_MODEL", "gemini-2.0-flash" if PROVIDER == "gemini" else "gpt-4o-mini")
 MAX_ITERATIONS = int(os.environ.get("CORTEX_MAX_ITERATIONS", "8"))
 MAX_REVISIONS = int(os.environ.get("CORTEX_MAX_REVISIONS", "2"))
 COST_CAP_USD = float(os.environ.get("CORTEX_COST_CAP_USD", "0.50"))
 MAX_QUEUE_ITEMS = int(os.environ.get("CORTEX_MAX_QUEUE_ITEMS", "10"))
 # Rough $ per 1M tokens for your chosen model, set to match its pricing.
-PRICE_IN = float(os.environ.get("CORTEX_PRICE_IN_PER_M", "0.15"))
-PRICE_OUT = float(os.environ.get("CORTEX_PRICE_OUT_PER_M", "0.60"))
+PRICE_IN = float(os.environ.get("CORTEX_PRICE_IN_PER_M", "0.075" if "gemini" in MODEL.lower() else "0.15"))
+PRICE_OUT = float(os.environ.get("CORTEX_PRICE_OUT_PER_M", "0.30" if "gemini" in MODEL.lower() else "0.60"))
+
 
 TOOL_SCHEMAS = [
     {"type": "function", "function": {
@@ -137,8 +139,47 @@ def emit_deliverable(which: str, draft: str, *, accepted: bool,
               f"(for your review, nothing was posted)")
 
 
+def get_client() -> tuple[OpenAI, str]:
+    """Initialize client with Gemini-first support while maintaining full compatibility with OpenAI/others.
+
+    Uses Gemini's official OpenAI-compatible endpoint:
+    https://generativelanguage.googleapis.com/v1beta/openai/
+    """
+    gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    custom_base_url = os.environ.get("CORTEX_BASE_URL")
+    provider = os.environ.get("CORTEX_PROVIDER", "").lower()
+
+    # Use OpenAI if explicitly requested or if only OpenAI key is present
+    if provider == "openai" or (openai_key and not gemini_key and provider != "gemini"):
+        kwargs = {}
+        if custom_base_url:
+            kwargs["base_url"] = custom_base_url
+        if openai_key:
+            kwargs["api_key"] = openai_key
+        return OpenAI(**kwargs), MODEL
+
+    # Default to Gemini via Google's official OpenAI-compatible endpoint
+    api_key = gemini_key or openai_key or ""
+    base_url = custom_base_url or "https://generativelanguage.googleapis.com/v1beta/openai/"
+    return OpenAI(api_key=api_key, base_url=base_url), MODEL
+
+
 def run(which: str = "happy") -> None:
-    client = OpenAI()
+    client, model = get_client()
+
+    api_key = getattr(client, "api_key", "") or ""
+    if not api_key or api_key.startswith("AIzaSy...") or api_key.startswith("sk-..."):
+        banner("API KEY REQUIRED IN 00-build/.env")
+        if "gemini" in model.lower():
+            print("Cortex is configured for Gemini (default).")
+            print("Please add your GEMINI_API_KEY to 00-build/.env")
+            print("Get a free key from Google AI Studio: https://aistudio.google.com/app/apikey")
+        else:
+            print("Please add your OPENAI_API_KEY to 00-build/.env")
+        print(f"\nOnce set, run again:\n    .venv/bin/python agent.py {which}")
+        return
+
     bounds = Bounds()
     task = tools.get_task(which)
     if "error" in task:
@@ -165,7 +206,7 @@ def run(which: str = "happy") -> None:
             return
 
         resp = client.chat.completions.create(
-            model=MODEL, messages=messages, tools=TOOL_SCHEMAS)
+            model=model, messages=messages, tools=TOOL_SCHEMAS)
         bounds.add(resp.usage)
         msg = resp.choices[0].message
 
@@ -188,7 +229,7 @@ def run(which: str = "happy") -> None:
         print(f"\n[step {step}] PROPOSED OUTPUT:\n{proposed}")
 
         banner("CRITIC, independent validation")
-        verdict = review(client, MODEL, proposed, "\n".join(source_log))
+        verdict = review(client, model, proposed, "\n".join(source_log))
         # Estimate critic spend too.
         bounds.cost += (verdict["_usage"]["prompt"] * PRICE_IN
                         + verdict["_usage"]["completion"] * PRICE_OUT) / 1_000_000
