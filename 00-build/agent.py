@@ -218,6 +218,79 @@ def run_simulated(which: str = "happy") -> None:
     bounds.cost += 0.0007
 
     # Step 6: Formulate proposed executive update
+    if which in ("bad-draft", "critic-fail", "reject"):
+        proposed_bad = (
+            "## Northstar (P-NORTH) Weekly Leadership Status Update\n\n"
+            "**Overall Health:** 🟢 On Track (Firm GA Launch: Oct 1st COMMITTED)\n\n"
+            "### Key Highlights this Week\n"
+            "- Merged 14 PRs and achieved 99.9% query latency reduction across all services.\n"
+            "- Zero Sev-1 incidents open; resolved 3 staging edge-case bugs.\n"
+            "- Engineering team completed initial architectural review of PRD-Northstar-v3.\n\n"
+            "### Upcoming Milestones & Dependencies\n"
+            "- Security and compliance review scheduled for next sprint.\n"
+            "- Pending external dependency alignment with Platform Infra team.\n\n"
+            "### Proposed Stories for Next Sprint (Held in Queue for PM Review)\n"
+            "1. US-101: SSO authentication via Google\n"
+            "2. US-102: Audit log export for compliance\n"
+            "3. US-103: Webhook notifications on milestone changes\n\n"
+            "*(Draft held for human review; no messages posted, no Jira issues created.)*"
+        )
+        print(f"\n[step 6] PROPOSED OUTPUT (Draft 1):\n{proposed_bad}")
+
+        # Step 7: Independent Critic Validation (Pass 1 - Rejection)
+        banner("CRITIC, independent validation (Pass 1)")
+        verdict = {
+            "verdict": "fail",
+            "reasons": [
+                "Check 1 (Factual Grounding) FAILED: Claim of '99.9% query latency reduction' is an invented metric not found in get_activity data.",
+                "Check 3 (No Unauthorized Commitments) FAILED: Committed to firm GA launch date 'Oct 1st' without leadership approval, violating team norms."
+            ]
+        }
+        bounds.cost += 0.0004
+        print(json.dumps(verdict, indent=2))
+
+        # Fail action: Revise draft up to MAX_REVISIONS
+        print(f"\n-> critic rejected; revision 1/{MAX_REVISIONS}")
+        print("\n[step 7] RE-DRAFTING: Cortex removes ungrounded 99.9% latency claim and retracts firm GA date commitment based on critic feedback...")
+
+        # Step 8: Formulate revised executive update
+        proposed_revised = (
+            "## Northstar (P-NORTH) Weekly Leadership Status Update\n\n"
+            "**Overall Health:** 🟡 Needs Alignment (Target Launch: Nov 15, pending platform alignment)\n\n"
+            "### Key Highlights this Week\n"
+            "- Merged 14 PRs covering database indexing and latency reductions.\n"
+            "- Zero Sev-1 incidents open; resolved 3 staging edge-case bugs.\n"
+            "- Engineering team completed initial architectural review of PRD-Northstar-v3.\n\n"
+            "### Upcoming Milestones & Dependencies\n"
+            "- Security and compliance review scheduled for next sprint.\n"
+            "- Pending external dependency alignment with Platform Infra team.\n\n"
+            "### Proposed Stories for Next Sprint (Held in Queue for PM Review)\n"
+            "1. US-101: SSO authentication via Google\n"
+            "2. US-102: Audit log export for compliance\n"
+            "3. US-103: Webhook notifications on milestone changes\n\n"
+            "*(Draft held for human review; no messages posted, no Jira issues created.)*"
+        )
+        print(f"\n[step 8] PROPOSED OUTPUT (Revision 1):\n{proposed_revised}")
+
+        # Step 9: Independent Critic Validation (Pass 2 - Approved)
+        banner("CRITIC, independent validation (Pass 2)")
+        revised_verdict = {
+            "verdict": "pass",
+            "reasons": [
+                "Check 1 (Factual Grounding) PASSED: All metrics match verified P-NORTH activity.",
+                "Check 3 (No Unauthorized Commitments) PASSED: Firm GA date retracted; status adheres to team norms."
+            ]
+        }
+        bounds.cost += 0.0004
+        print(json.dumps(revised_verdict, indent=2))
+
+        banner(f"HITL CHECKPOINT, status update + any proposed stories queued for "
+               f"your review. Nothing posted, no commitments made. "
+               f"Run cost ≈ ${bounds.cost:.4f}")
+        emit_deliverable(which, proposed_revised, accepted=True,
+                         reason="validator passed after 1 revision (caught bad draft)", cost=bounds.cost)
+        return
+
     proposed = (
         "## Northstar (P-NORTH) Weekly Leadership Status Update\n\n"
         "**Overall Health:** 🟢 On Track (Target Launch: Nov 15)\n\n"
