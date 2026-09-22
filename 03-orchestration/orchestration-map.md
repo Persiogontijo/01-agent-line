@@ -41,6 +41,112 @@
                            [Escalate to PM]
 ```
 
+### Visual Orchestration Flow
+
+```mermaid
+flowchart TD
+    %% Triggers
+    subgraph Triggers ["⚡ Trigger Layer"]
+        T1["Pre-Meeting Hook<br/>(Calendar Event: 30 min before)"]
+        T2["Weekly Cron<br/>(Monday 9:00 AM)"]
+        T3["On-Demand PRD Hook<br/>(PRD-Northstar-v3 update)"]
+    end
+
+    %% Cortex Orchestrator
+    subgraph PrimaryAgent ["🤖 Primary Agent: Cortex (Chief-of-Staff)"]
+        direction TB
+        C1["Ingest PM Task Brief & Context"]
+        C2["Execute Tool Calls in Sequence"]
+        C3["Synthesize Draft Update & Queue Stories"]
+    end
+
+    %% Tool Ecosystem
+    subgraph Tools ["🛠️ Tool & Fixture Boundary (Read-Only + Propose)"]
+        direction TB
+        TL1["get_project('P-NORTH')"]
+        TL2["get_activity('P-NORTH')"]
+        TL3["search_past_updates('Northstar')"]
+        TL4["get_norms('status format')"]
+        TL5["propose_stories(queue <= 10)"]
+    end
+
+    %% State Isolation Boundary
+    subgraph StateBoundary ["🔒 State Isolation Boundary"]
+        SB["Hand-off Payload Only:<br/>• source_data (raw facts)<br/>• proposed_output (draft text)<br/>(Cortex scratchpad & internal thoughts are HIDDEN)"]
+    end
+
+    %% Independent Validator Subagent
+    subgraph CriticSubagent ["🛡️ Independent Validator Subagent (Critic)"]
+        CR1["Load Independent Gemini Context<br/>(System Prompt: CRITIC_SYSTEM)"]
+        CR2{"Validate 5 Checkable Rules:<br/>1. Factual Grounding<br/>2. Confidentiality Guard<br/>3. No Unauthorized Dates<br/>4. Queue Cap <= 10<br/>5. No Auto-Publish"}
+    end
+
+    %% Revision and Escalation Logic
+    subgraph ControlFlow ["⚙️ Harness Control & Bounds (agent.py)"]
+        REV{"Revisions < 2?"}
+        ESC["🚨 ESCALATE to Human PM<br/>(Revision cap hit / Bounds tripped)"]
+    end
+
+    %% Human Review Gate
+    subgraph HITL ["👤 Human-in-the-Loop Gate (Above the Agent Line)"]
+        HOLD["Save Draft Locally<br/>run-output/status-update-task.md"]
+        PM["PM Reviews, Approves, & Releases<br/>(Zero auto-send / No publish tool)"]
+    end
+
+    %% Flow Connections
+    T1 --> C1
+    T2 --> C1
+    T3 --> C1
+
+    C1 --> C2
+    C2 <--> TL1
+    C2 <--> TL2
+    C2 <--> TL3
+    C2 <--> TL4
+    C2 <--> TL5
+    C2 --> C3
+
+    C3 --> SB
+    SB --> CR1
+    CR1 --> CR2
+
+    %% Critic Verdicts
+    CR2 -- "verdict: pass" --> HOLD
+    CR2 -- "verdict: fail" --> REV
+
+    REV -- "Yes (Rev 1/2)" -->|Return failure reasons| C3
+    REV -- "No (Cap Hit)" --> ESC
+    ESC --> PM
+    HOLD --> PM
+
+    %% Styling
+    classDef trigger fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
+    classDef agent fill:#ede7f6,stroke:#512da8,stroke-width:2px;
+    classDef tool fill:#fbe9e7,stroke:#d84315,stroke-width:2px;
+    classDef critic fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef hitl fill:#fff3e0,stroke:#ef6c00,stroke-width:2px;
+    classDef control fill:#fce4ec,stroke:#c2185b,stroke-width:2px;
+
+    class T1,T2,T3 trigger;
+    class C1,C2,C3 agent;
+    class TL1,TL2,TL3,TL4,TL5 tool;
+    class CR1,CR2 critic;
+    class HOLD,PM hitl;
+    class REV,ESC,SB control;
+```
+
+### Key Architectural Characteristics
+
+| Architectural Step / Layer | Pattern / Mechanism | Concrete Behavior in Cortex | Enforcement & Safety Boundary |
+|---|---|---|---|
+| **1. Trigger Layer** *(Starts the Loop)* | **Hybrid: Event Hook with Cron Backup** | **Three Triggers:**<br>• **Primary:** Calendar Hook fires **30 mins before** weekly leadership/status meetings.<br>• **Secondary (Backup):** Cron sweep every **Monday at 9:00 AM** (`0 9 * * 1`).<br>• **On-Demand:** Artifact hook fires when a PRD update is detected (`PRD-Northstar-v3`). | **Idempotency & Deduplication:** Runs are keyed by `event_id + date` or `sprint_id + week`. If a draft exists in `run-output/`, the loop halts to prevent duplicate queries or token burn. |
+| **2. Topology** | **Single + Validator Subagent** | Cortex acts as the primary drafter/orchestrator; an independent critic subagent evaluates the output prior to human delivery. | Subagent operates strictly as a read-only inspector; no lateral agent-to-agent tool calls or unconstrained agent sprawl. |
+| **3. State Boundary** | **Strict Context Isolation** | Cortex only passes `source_data` (raw facts) and `proposed_output` (draft). Scratchpad, tool reasoning, and chain-of-thought are hidden from the critic. | Prevents drafter confirmation bias and guarantees the critic cannot inherit drafting blind spots. |
+| **4. Validator Checks** | **5 Deterministic Rules** | Inspects: (1) Factual Grounding, (2) Confidentiality / Embargoes, (3) Unauthorized Date Commitments, (4) Queue Cap ($\le 10$), (5) Tool Restraint. | Critic returns structured JSON `{"verdict": "pass" \| "fail", "reasons": [...]}`. Fails on *any* non-compliant rule. |
+| **5. Feedback Loop** | **Tiered Fail-Action** | On failure, the critic bounces the draft back with explicit reasons (`revision 1/2`) so Cortex can self-correct ungrounded claims or commitments. | Bounded by `MAX_REVISIONS = 2`. If exceeded, execution halts immediately and escalates to human PM. |
+| **6. Harness Bounds** | **External Circuit Breakers** | Spend cap (`COST_CAP_USD = $0.50`), loop limit (`MAX_ITERATIONS = 8`), and queue cap (`MAX_QUEUE_ITEMS = 10`) tracked outside model memory. | Hard-coded in `agent.py`; model instructions cannot override or negotiate these limits. |
+| **7. The Agent Line** | **HITL Review Checkpoint** | Drafts are written locally to `run-output/status-update-<task>.md` for PM approval and release. | **Zero publishing tools.** Cortex possesses no API capability to post to Slack, create Jira tickets, or merge PRs. |
+
 ## 3. Roster
 
 | Agent / subagent | Responsibility | Runs which Loop Spec |
