@@ -177,6 +177,53 @@ def run_simulated(which: str = "happy") -> None:
 
     source_log: list[str] = [task["body"]]
 
+    if which == "missing-data":
+        # Step 1: Query project metadata for P-HALO
+        print("\n[step 1] TOOL get_project({'project_id': 'P-HALO'})")
+        proj = tools.get_project("P-HALO")
+        source_log.append(f"get_project({{'project_id': 'P-HALO'}}) -> {json.dumps(proj)}")
+        print(f"          -> {json.dumps(proj)}")
+        bounds.cost += 0.0004
+
+        # Step 2: Query team norms on handling missing project data and dates
+        print("\n[step 2] TOOL get_norms({'query': 'missing project unconfirmed dates'})")
+        norms = tools.get_norms("missing project unconfirmed dates")
+        source_log.append(f"get_norms(...) -> {json.dumps(norms)[:200]}")
+        print(f"          -> {json.dumps(norms)[:300]}")
+        bounds.cost += 0.0005
+
+        # Step 3: Cortex refuses to invent progress or commit an unverified GA date, and escalates
+        escalate_msg = (
+            "## Refusal & Escalation: Cannot Draft Update for Project Halo (P-HALO)\n\n"
+            "**Status:** 🔴 Execution Halted / Escalated to Human PM\n\n"
+            "### Why this run halted:\n"
+            "1. **Project Not Found:** The requested project ID `P-HALO` does not exist in the project registry (`projects.json`). Known projects are `P-NORTH` and `P-SOLAR`.\n"
+            "2. **No Grounding Activity:** Without valid project records, no engineering PRs, issues, or commit activity can be pulled.\n"
+            "3. **Norms Compliance (No Invented Dates):** Team norms strictly forbid committing to firm GA launch dates without verified project data and human sign-off.\n\n"
+            "### Action Required:\n"
+            "Please confirm if `P-HALO` is registered under an alternative project key or provide project fixtures before re-running."
+        )
+        print(f"\n[step 3] PROPOSED OUTPUT (Escalation):\n{escalate_msg}")
+
+        # Step 4: Independent Critic Validation (Evaluates Escalation)
+        banner("CRITIC, independent validation")
+        verdict = {
+            "verdict": "pass",
+            "reasons": [
+                "Escalation is correct: Project P-HALO not found in system and cannot be grounded.",
+                "Norms respected: Refused to invent progress or commit to an unconfirmed GA launch date.",
+                "Tool restraint: Posted nothing, queued 0 unauthorized stories, leaked no confidential data."
+            ]
+        }
+        bounds.cost += 0.0004
+        print(json.dumps(verdict, indent=2))
+
+        banner("BOUND / EXCEPTION TRIPPED: Project not found & unverified GA date requested. Halting and escalating to HITL.")
+        emit_deliverable(which, escalate_msg, accepted=False,
+                         reason="Project 'P-HALO' not found in registry; refused to invent GA date. Escalated to human PM.",
+                         cost=bounds.cost)
+        return
+
     # Step 1: Query project metadata
     print("\n[step 1] TOOL get_project({'project_id': 'P-NORTH'})")
     proj = tools.get_project("P-NORTH")
@@ -295,9 +342,10 @@ def run_simulated(which: str = "happy") -> None:
         "## Northstar (P-NORTH) Weekly Leadership Status Update\n\n"
         "**Overall Health:** 🟢 On Track (Target Launch: Nov 15)\n\n"
         "### Key Highlights this Week\n"
-        "- Merged 14 PRs covering database indexing and latency reductions.\n"
-        "- Zero Sev-1 incidents open; resolved 3 staging edge-case bugs.\n"
-        "- Engineering team completed initial architectural review of PRD-Northstar-v3.\n\n"
+        "- Merged PR #820 (Day-2 milestone email) and PR #823 (Empty-state guidance copy, closes #818).\n"
+        "- Activation rate increased to 43% (prior 41%, week-over-week growth).\n"
+        "- Open issue #825 (Contextual tips A/B) flagged for analytics review; zero Sev-1 incidents.\n"
+        "- Confidential initiatives (Orbit, Pulsar) held strictly out of update per team norms.\n\n"
         "### Upcoming Milestones & Dependencies\n"
         "- Security and compliance review scheduled for next sprint.\n"
         "- Pending external dependency alignment with Platform Infra team.\n\n"
@@ -314,9 +362,10 @@ def run_simulated(which: str = "happy") -> None:
     verdict = {
         "verdict": "pass",
         "reasons": [
-            "Output grounded in verified P-NORTH activity",
+            "Output grounded in verified P-NORTH activity (#820, #823, activation 43%)",
             "Follows executive summary norms and bulleted milestones",
-            "Stories proposed within queue limit (3/10) and held for human review"
+            "Stories proposed within queue limit (3/10) and held for human review",
+            "Zero confidential leaks (Orbit and Pulsar excluded)"
         ]
     }
     bounds.cost += 0.0004
